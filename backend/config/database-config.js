@@ -19,8 +19,8 @@ export const connectDB = async () => {
 
         console.log("AI SYSTEM: Connecting to MongoDB Atlas... 🔄");
         const conn = await mongoose.connect(uri, {
-            serverSelectionTimeoutMS: 8000, // Slightly more time for cold starts
-            maxPoolSize: 1, // Crucial for serverless functions
+            serverSelectionTimeoutMS: 8000, 
+            maxPoolSize: 10,
             socketTimeoutMS: 45000,
         });
         
