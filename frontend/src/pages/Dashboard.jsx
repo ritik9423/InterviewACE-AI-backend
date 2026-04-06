@@ -81,7 +81,7 @@ const Dashboard = () => {
                         animate={{ opacity: 1, x: 0 }}
                     >
                         <div className="flex items-center gap-2.5 mb-3">
-                            <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 text-[9px] font-black uppercase tracking-widest border border-indigo-500/20 rounded-full">Pro Member</span>
+                            <span className="px-3 py-1 bg-emerald-500/10 text-emerald-400 text-[9px] font-black uppercase tracking-widest border border-emerald-500/20 rounded-full">Unlimited Access</span>
                         </div>
                         <h1 className="text-3xl md:text-4xl font-black tracking-tighter mb-2 font-heading leading-none">
                             Welcome back, <span className="text-indigo-400">{user.name || 'Developer'}</span>
@@ -242,13 +242,13 @@ const Dashboard = () => {
                             </div>
                         </section>
 
-                        <section className="p-8 rounded-3xl bg-gradient-to-br from-indigo-600/20 to-purple-600/20 border border-indigo-500/30 relative overflow-hidden group">
+                        <section className="p-8 rounded-3xl bg-gradient-to-br from-emerald-600/20 to-teal-600/20 border border-emerald-500/30 relative overflow-hidden group">
                            <div className="relative z-10">
-                                <span className="px-2.5 py-1 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-full mb-4 inline-block">Limited Offer</span>
-                                <h3 className="text-xl font-black mb-1 font-heading">Expert Mentorship</h3>
-                                <p className="text-slate-400 text-xs mb-6 leading-relaxed">Get 1-on-1 sessions with senior engineers from top tech companies.</p>
+                                <span className="px-2.5 py-1 bg-white text-black text-[9px] font-black uppercase tracking-widest rounded-full mb-4 inline-block">Active Benefit</span>
+                                <h3 className="text-xl font-black mb-1 font-heading">AI Powerhouse</h3>
+                                <p className="text-slate-400 text-xs mb-6 leading-relaxed">Your account has been upgraded to the highest synchronization tier. Enjoy unlimited interview generations.</p>
                                 <button className="w-full py-3 bg-white text-black font-black rounded-xl hover:bg-slate-100 transition-all active:scale-95 shadow-xl text-xs">
-                                    Unlock Access
+                                    View Full Analytics
                                 </button>
                            </div>
                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/5 rounded-full blur-3xl group-hover:bg-white/10 transition-all duration-700" />

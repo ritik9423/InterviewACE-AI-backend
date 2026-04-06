@@ -30,7 +30,7 @@ const InterviewPrep = () => {
             
             if (sessionData && sessionData.questions && sessionData.questions.length > 0) {
                 setQuestions(sessionData.questions);
-            } else {
+            } else if (!isRetrying) {
                 handleGenerateQuestions();
             }
         } catch (err) {
