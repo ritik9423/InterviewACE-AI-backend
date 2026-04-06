@@ -19,7 +19,9 @@ export const connectDB = async () => {
 
         console.log("AI SYSTEM: Connecting to MongoDB Atlas... 🔄");
         const conn = await mongoose.connect(uri, {
-            serverSelectionTimeoutMS: 5000, // Faster timeout for serverless
+            serverSelectionTimeoutMS: 8000, // Slightly more time for cold starts
+            maxPoolSize: 1, // Crucial for serverless functions
+            socketTimeoutMS: 45000,
         });
         
         cachedConnection = conn;
