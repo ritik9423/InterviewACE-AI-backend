@@ -18,16 +18,17 @@ const PORT = process.env.PORT || 9000;
 
 // Database Connection Middleware (Serverless Friendly)
 const ensureConnection = async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: "Database Connection Failed", 
-      error: error.message 
-    });
-  }
+    try {
+        await connectDB();
+        next();
+    } catch (error) {
+        console.error("AI SYSTEM: Connection Middleware Error:", error.message);
+        res.status(500).json({ 
+            success: false, 
+            message: "Database Connection Failed. Check if your IP is whitelisted in MongoDB Atlas and password is correct.", 
+            error: error.message 
+        });
+    }
 };
 
 // Middlewares
@@ -66,9 +67,24 @@ app.use((err, req, res, next) => {
 
 // Server start check for local development
 if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`🚀 Session Active: http://localhost:${PORT}`);
-  });
+// Start Server after DB Connection
+const startServer = async () => {
+    try {
+        console.log("AI SYSTEM: Initializing Startup... 🚀");
+        await connectDB();
+        const PORT = process.env.PORT || 9000;
+        app.listen(PORT, () => {
+            console.log(`🚀 Server running on: http://localhost:${PORT}`);
+            console.log("AI SYSTEM: Ready for Interviews! 🎯");
+        });
+    } catch (error) {
+        console.error("AI SYSTEM: Critical Startup Failure! ❌");
+        console.error(error.message);
+        process.exit(1);
+    }
+};
+
+startServer();
 }
 
 export default app;

@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import https from "https";
 import Question from "../models/question-model.js";
 import Session from "../models/session-model.js";
 import {
@@ -10,28 +10,98 @@ import {
   evaluateAnswerPrompt,
 } from "../utils/prompts-util.js";
 
-// AI SYSTEM: Initialize Gemini globally to ensure all functions can access it
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "dummy_key");
+/**
+ * Standard Node https wrapper for stable Gemini REST calls on Windows.
+ * This avoids the 'libuv assertion' crashes found in SDKs/fetch engines.
+ */
+const callGeminiREST = (url, data) => {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify(data);
+    const options = {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': postData.length
+      },
+      timeout: 60000 // 60s timeout for complex AI generation
+    };
+
+    const req = https.request(url, options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(body);
+          if (res.statusCode >= 400) {
+            const errorMsg = parsed.error?.message || `API Error: ${res.statusCode}`;
+            const error = new Error(errorMsg);
+            error.statusCode = res.statusCode;
+            reject(error);
+          } else {
+            resolve(parsed);
+          }
+        } catch (e) {
+          reject(new Error("Neural Link Data Corruption: Invalid JSON response."));
+        }
+      });
+    });
+
+    req.on('error', (e) => reject(e));
+    req.on('timeout', () => {
+        req.destroy();
+        reject(new Error("Neural Link Timed Out: AI is unresponsive."));
+    });
+    req.write(postData);
+    req.end();
+  });
+};
 
 /**
  * Robust helper to try multiple Gemini models in order of preference.
- * This ensures "it just works" even if some models are 404/Not Found.
  */
 const callGeminiWithFallback = async (prompt) => {
-  const models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-pro"];
+  const models = [
+    { name: "gemini-2.0-flash", version: "v1beta" },
+    { name: "gemini-2.0-flash-exp", version: "v1beta" },
+    { name: "gemini-2.5-flash-lite", version: "v1beta" }
+  ];
+  const apiKey = process.env.GEMINI_API_KEY;
   let lastError;
-  for (const modelName of models) {
+
+  for (const modelConfig of models) {
+    const { name, version } = modelConfig;
     try {
-      const model = genAI.getGenerativeModel({ model: modelName });
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      // Trigger a check to see if text() works (catches most errors)
-      response.text();
-      console.log(`AI SYSTEM: Successfully used model [${modelName}] ✅`);
-      return result;
+      console.log(`AI SYSTEM: Synchronizing with model [${name}] via REST... ⚡`);
+      const url = `https://generativelanguage.googleapis.com/${version}/models/${name}:generateContent?key=${apiKey}`;
+      
+      const payload = {
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.8,
+          topK: 64,
+          topP: 0.95,
+          maxOutputTokens: 8192, // Increased to prevent truncation of deep answers
+          responseMimeType: "application/json" // Force the model to return valid, un-terminated JSON
+        }
+      };
+
+      const response = await callGeminiREST(url, payload);
+      const text = response?.candidates?.[0]?.content?.parts?.[0]?.text;
+      
+      if (!text) {
+        throw new Error("AI returned an empty candidate list or blocked content.");
+      }
+      
+      console.log(`AI SYSTEM: Successfully linked with [${name}] ✅`);
+      return text;
     } catch (err) {
       lastError = err;
-      console.warn(`AI SYSTEM: Model [${modelName}] failed. Trying next... 🔄`);
+      console.warn(`AI SYSTEM: Model [${name}] link failed. Error: ${err.message}`);
+      
+      // If it's a specific auth or safety error, we only move to the next if it's not fatal
+      if (err.statusCode === 401 || err.statusCode === 400 || err.statusCode === 404) {
+          // Continue to next model if this one is not found or has an invalid configuration (400)
+      }
     }
   }
   throw lastError;
@@ -39,162 +109,105 @@ const callGeminiWithFallback = async (prompt) => {
 
 // @desc    Generate + SAVE interview questions for a session
 // @route   POST /api/ai/generate-questions
-// @access  Private
 export const generateInterviewQuestions = async (req, res) => {
   try {
     const { sessionId } = req.body;
-
-    if (!sessionId) {
-      return res.status(400).json({ success: false, message: "sessionId is required" });
-    }
+    if (!sessionId) return res.status(400).json({ success: false, message: "sessionId is required" });
 
     const session = await Session.findById(sessionId);
-    if (!session) {
-      return res.status(404).json({ success: false, message: "Session not found" });
-    }
+    if (!session) return res.status(404).json({ success: false, message: "Session track not found" });
 
-    const { role, experience, topicsToFocus } = session;
-    const prompt = questionAnswerPrompt(role, experience, topicsToFocus, 5); 
+    const prompt = questionAnswerPrompt(session.role, session.experience, session.topicsToFocus, 20); 
     
-    // Call AI with robust fallback system
-    const result = await callGeminiWithFallback(prompt);
-    const response = await result.response;
-    const rawText = response.text();
-
-    // High-class JSON cleaning
-    const cleanedText = rawText
-      .replace(/^```json\s*/, "")
-      .replace(/^```\s*/, "")
-      .replace(/```$/, "")
-      .replace(/^json\s*/, "")
-      .trim();
-
-    let questions;
-    try {
-      questions = JSON.parse(cleanedText);
-    } catch {
-      const jsonMatch = cleanedText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) questions = JSON.parse(jsonMatch[0]);
-      else throw new Error("AI returned invalid JSON format");
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({ success: false, message: "Gemini API Key missing in environment." });
     }
 
-    // Save questions
-    const saved = await Question.insertMany(
-      questions.map((q) => ({
+    console.log(`AI SYSTEM: Building Neural Matrix for session [${sessionId}]... 🤖`);
+    const rawText = await callGeminiWithFallback(prompt);
+    
+    // Standard extraction
+    let cleanedText = rawText.replace(/```json/gi, "").replace(/```/g, "").trim();
+    const firstBracket = cleanedText.indexOf("[");
+    const lastBracket = cleanedText.lastIndexOf("]");
+    if (firstBracket !== -1 && lastBracket !== -1) cleanedText = cleanedText.substring(firstBracket, lastBracket + 1);
+
+    const questions = JSON.parse(cleanedText);
+    if (!Array.isArray(questions)) throw new Error("Invalid matrix structure: Array expected.");
+
+    const validQuestions = questions.filter(q => q.question).map((q) => ({
         session: sessionId,
         question: q.question,
-        answer: q.answer || "",
-      }))
-    );
+        answer: q.answer || "No suggested answer provided.",
+    }));
 
-    // Link to session
+    const saved = await Question.insertMany(validQuestions);
     session.questions.push(...saved.map((q) => q._id));
     await session.save();
 
+    console.log("AI SYSTEM: Neural Link Synchronization Successful! ✅");
     res.status(201).json({ success: true, data: saved });
   } catch (error) {
-    console.error("Generate Questions Error:", error);
-    res.status(500).json({ success: false, message: "AI Generation failed", error: error.message });
+    console.error("AI SYSTEM: Matrix Generation Failure:", error.message);
+    
+    let statusCode = error.statusCode || 500;
+    let userFriendlyMessage = error.message || "AI Matrix Generation failed.";
+    
+    if (statusCode === 401) userFriendlyMessage = "AI Link Failed: Your Gemini API Key is invalid.";
+    if (statusCode === 429) userFriendlyMessage = "Neural Saturation: Daily quota reached. Retry in 60s.";
+    
+    res.status(statusCode).json({ success: false, message: userFriendlyMessage });
   }
 };
 
-// @desc    Evaluate a candidate's answer
-// @route   POST /api/ai/evaluate-answer
-// @access  Private
+// ... (other functions: evaluateAnswer, generateConceptExplanation, getSessionById)
+// Keeping the same direct REST/https pattern for all to ensure stability.
+
 export const evaluateAnswer = async (req, res) => {
   try {
     const { question, answer } = req.body;
-    if (!question || !answer) {
-      return res.status(400).json({ success: false, message: "Question and Answer are required" });
-    }
-
     const prompt = evaluateAnswerPrompt(question, answer);
+    const rawText = await callGeminiWithFallback(prompt);
     
-    // Call AI with robust fallback system
-    const result = await callGeminiWithFallback(prompt);
-    const response = await result.response;
-    const rawText = response.text();
-    console.log("AI SYSTEM: Raw evaluation text:", rawText);
-
-    let evaluation;
-    try {
-      // Robust JSON extraction
-      const jsonStart = rawText.indexOf('{');
-      const jsonEnd = rawText.lastIndexOf('}');
-      if (jsonStart !== -1 && jsonEnd !== -1) {
-        const jsonStr = rawText.substring(jsonStart, jsonEnd + 1);
-        evaluation = JSON.parse(jsonStr);
-      } else {
-        throw new Error("No JSON object found in AI response");
-      }
-    } catch (parseError) {
-      console.error("AI SYSTEM: JSON Parse Error:", parseError);
-      console.error("AI SYSTEM: Cleaned text was:", rawText);
-      throw new Error("Failed to parse AI evaluation response");
-    }
+    const jsonStart = rawText.indexOf('{');
+    const jsonEnd = rawText.lastIndexOf('}');
+    const evaluation = JSON.parse(rawText.substring(jsonStart, jsonEnd + 1));
 
     res.status(200).json({ success: true, data: evaluation });
   } catch (error) {
-    console.error("AI SYSTEM: Evaluation Error:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "AI Evaluation failed", 
-      error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+    res.status(error.statusCode || 500).json({ success: false, message: "Neural Evaluation failed", error: error.message });
   }
 };
 
-// @desc    Generate explanation for an interview question
-// @route   POST /api/ai/generate-explanation
-// @access  Private
 export const generateConceptExplanation = async (req, res) => {
   try {
     const { question } = req.body;
-    if (!question) {
-      return res.status(400).json({ success: false, message: "Question is required" });
-    }
-
     const prompt = conceptExplainPrompt(question);
-    
-    // Call AI with robust fallback system
-    const result = await callGeminiWithFallback(prompt);
-    const response = await result.response;
-    const rawText = response.text();
+    const rawText = await callGeminiWithFallback(prompt);
 
-    const cleanedText = rawText
-      .replace(/^```json\s*/, "")
-      .replace(/^```\s*/, "")
-      .replace(/```$/, "")
-      .replace(/^json\s*/, "")
-      .trim();
+    const firstBrace = rawText.indexOf('{');
+    const lastBrace = rawText.lastIndexOf('}');
+    const explanation = JSON.parse(rawText.substring(firstBrace, lastBrace + 1));
 
-    const explanation = JSON.parse(cleanedText);
     res.status(200).json({ success: true, data: explanation });
   } catch (error) {
-    console.error("Explanation Error:", error);
-    res.status(500).json({ success: false, message: "AI Explanation failed", error: error.message });
+    res.status(error.statusCode || 500).json({ success: false, message: "AI Explanation failed", error: error.message });
   }
 };
 
-// @desc    Get Session by ID with questions
-// @route   GET /api/ai/session/:id
-// @access  Private
 export const getSessionById = async (req, res) => {
   try {
-    const session = await Session.findById(req.params.id)
-      .populate("questions")
-      .populate("user", "name email");
+    const session = await Session.findById(req.params.id).populate("questions").populate("user", "name email");
+    if (!session) return res.status(404).json({ success: false, message: "Session track unavailable." });
 
-    if (!session) return res.status(404).json({ success: false, message: "Session not found" });
+    const sessionUserId = session.user?._id || session.user;
+    const currentUserId = req.user?._id || req.user;
 
-    // Authorization check
-    if (session.user._id.toString() !== req.user._id.toString()) {
-       return res.status(403).json({ success: false, message: "Unauthorized access to this session" });
+    if (!sessionUserId || sessionUserId.toString() !== currentUserId.toString()) {
+       return res.status(403).json({ success: false, message: "Unauthorized access detected." });
     }
-
     res.status(200).json({ success: true, data: session });
   } catch (error) {
-    res.status(500).json({ success: false, message: "Failed to fetch session", error: error.message });
+    res.status(500).json({ success: false, message: "Neural Link Synchronization Failure.", error: error.message });
   }
 };

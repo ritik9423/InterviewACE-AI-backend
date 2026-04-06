@@ -18,8 +18,9 @@ export const connectDB = async () => {
         }
 
         console.log("AI SYSTEM: Connecting to MongoDB Atlas... 🔄");
+        console.log("URI Length Check:", uri ? uri.length : "EMPTY ❌");
         const conn = await mongoose.connect(uri, {
-            serverSelectionTimeoutMS: 8000, 
+            serverSelectionTimeoutMS: 15000, 
             maxPoolSize: 10,
             socketTimeoutMS: 45000,
         });

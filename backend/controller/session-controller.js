@@ -6,26 +6,28 @@ import Session from "../models/session-model.js";
 // @access  Private
 export const createSession = async (req, res) => {
   try {
-    const { role, experience, topicsToFocus, description, questions } =
+    const { role, experience, topicsToFocus, description, questions = [] } =
       req.body;
     const userId = req.user._id;
+
+    console.log(`AI SYSTEM: Creating new session for [${role}]... 📝`);
 
     // Create the session
     const session = await Session.create({
       user: userId,
-      role,
-      experience,
-      topicsToFocus,
-      description,
+      role: role || "Software Engineer",
+      experience: experience || 0,
+      topicsToFocus: topicsToFocus || "General",
+      description: description || "",
     });
 
-    // Create questions and collect their IDs
+    // Create questions and collect their IDs if any were provided (usually empty at start)
     const questionDocs = await Promise.all(
       questions.map(async (q) => {
         const question = await Question.create({
           session: session._id,
           question: q.question,
-          answer: q.answer || "",
+          answer: q.answer || "No answer provided",
           note: q.note || "",
           isPinned: q.isPinned || false,
         });
@@ -34,15 +36,18 @@ export const createSession = async (req, res) => {
     );
 
     // Update session with question IDs
-    session.questions = questionDocs;
-    await session.save();
+    if (questionDocs.length > 0) {
+      session.questions = questionDocs;
+      await session.save();
+    }
 
+    console.log(`AI SYSTEM: Session [${session._id}] created successfully! ✅`);
     res.status(201).json({
       success: true,
       data: session,
     });
   } catch (error) {
-    console.error("Create Session Error:", error);
+    console.error("AI SYSTEM: Create Session Error:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to create session",

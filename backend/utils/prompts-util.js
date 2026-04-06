@@ -12,9 +12,10 @@ Conduct a high-stakes technical interview for:
 
 Generate exactly ${numberOfQuestions} challenging but fair interview questions.
 Rules for each question:
-1. "answer": Provide a 'Senior-level' suggested answer. Use markdown for readability. Include a concise code snippet (max 8 lines) only if it significantly clarifies the concept.
-2. The questions should test both theoretical depth and practical problem-solving.
+1. "answer": Provide a 'Senior-level' suggested answer (2 paragraphs). Use markdown for readability. Include a concise code snippet (max 8 lines) only if it significantly clarifies the concept.
+2. The questions should test theoretical depth and practical problem-solving.
 3. Difficulty MUST match a candidate with ${experience} years of experience.
+4. IMPORTANT: Ensure your JSON response is complete and never truncated.
 
 Return ONLY a valid JSON array of objects:
 [
@@ -33,8 +34,8 @@ Deconstruct the following architectural/technical question:
 Structure:
 1. "title": 3-5 word high-impact title.
 2. "explanation": 
-   - Start with a bold one-sentence definition.
-   - 2 paragraphs of 'Deep-dive' explanation.
+   - A bold one-sentence definition.
+   - 1-2 paragraphs of 'Deep-dive' explanation.
    - Use a clear markdown list for key points.
    - One "Key Takeaway" summarizing the industry standard.
 
