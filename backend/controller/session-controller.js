@@ -6,10 +6,9 @@ import Session from "../models/session-model.js";
 // @access  Private
 export const createSession = async (req, res) => {
   try {
-    console.log(1);
     const { role, experience, topicsToFocus, description, questions } =
       req.body;
-    const userId = req.user._id; // Assuming you have a middleware setting req.user
+    const userId = req.user._id;
 
     // Create the session
     const session = await Session.create({
@@ -38,24 +37,15 @@ export const createSession = async (req, res) => {
     session.questions = questionDocs;
     await session.save();
 
-    // Return the populated session
-    // const populatedSession = await Session.findById(session._id).populate(
-    //   "questions",
-    // );
-
-    // res.status(201).json({
-    //   success: true,
-    //   data: populatedSession,
-    // });
     res.status(201).json({
       success: true,
-      session,
+      data: session,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Create Session Error:", error);
     res.status(500).json({
       success: false,
-      message: "Server Error",
+      message: "Failed to create session",
       error: error.message,
     });
   }
@@ -75,10 +65,10 @@ export const getMySessions = async (req, res) => {
     res.status(200).json({
       success: true,
       count: sessions.length,
-      sessions,
+      data: sessions,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get Sessions Error:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
@@ -107,10 +97,10 @@ export const getSessionById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      session,
+      data: session,
     });
   } catch (error) {
-    console.error(error);
+    console.error("Get Session Error:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };

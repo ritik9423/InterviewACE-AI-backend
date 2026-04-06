@@ -1,6 +1,27 @@
-import mongoose from "mongoose";
+let cachedConnection = null;
 
 export const connectDB = async () => {
-  await mongoose.connect(process.env.MONGODB_URI);
-  console.log("MongoDB connected");
+    if (cachedConnection) {
+        console.log("AI SYSTEM: Using cached MongoDB connection ✅");
+        return cachedConnection;
+    }
+
+    try {
+        const uri = process.env.MONGODB_URI;
+        if (!uri) {
+            throw new Error("MONGODB_URI is not defined in environment variables");
+        }
+
+        console.log("AI SYSTEM: Connecting to MongoDB Atlas... 🔄");
+        const conn = await mongoose.connect(uri, {
+            serverSelectionTimeoutMS: 5000, // Faster timeout for serverless
+        });
+        
+        cachedConnection = conn;
+        console.log(`AI SYSTEM: MongoDB Connected: ${conn.connection.host} ✅`);
+        return conn;
+    } catch (error) {
+        console.error(`AI SYSTEM: MongoDB Connection Error ❌: ${error.message}`);
+        throw error;
+    }
 };

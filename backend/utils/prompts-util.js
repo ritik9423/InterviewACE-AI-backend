@@ -4,49 +4,62 @@ export const questionAnswerPrompt = (
   topicsToFocus,
   numberOfQuestions,
 ) => {
-  return `You are a senior engineer conducting a technical interview.
-
-Generate exactly ${numberOfQuestions} interview questions for the following profile:
-- Role: ${role}
+  return `You are a Principal Software Engineer at a Tier-1 tech company.
+Conduct a high-stakes technical interview for:
+- Target Role: ${role}
 - Experience: ${experience} years
-- Topics to focus on: ${topicsToFocus || "general topics for this role"}
+- Specific Focus: ${topicsToFocus || "Core concepts, Architecture, and Best Practices"}
 
+Generate exactly ${numberOfQuestions} challenging but fair interview questions.
 Rules for each question:
-1. The "answer" field must be well-structured using markdown:
-   - Use **bold** for key terms
-   - Use bullet points or numbered lists where appropriate
-   - Add a short \`\`\`js ... \`\`\` code block when relevant (keep it under 10 lines)
-   - Break the answer into short paragraphs — never one wall of text
-2. Answers should be beginner-friendly but technically accurate.
-3. Difficulty should match ${experience} years of experience.
+1. "answer": Provide a 'Senior-level' suggested answer. Use markdown for readability. Include a concise code snippet (max 8 lines) only if it significantly clarifies the concept.
+2. The questions should test both theoretical depth and practical problem-solving.
+3. Difficulty MUST match a candidate with ${experience} years of experience.
 
-Return ONLY a valid JSON array. No extra text, no markdown wrapper around the JSON.
-
+Return ONLY a valid JSON array of objects:
 [
   {
-    "question": "...",
-    "answer": "**Definition:** ...\\n\\n**Key points:**\\n- Point 1\\n- Point 2\\n\\n\`\`\`js\\n// example\\n\`\`\`"
+    "question": "string",
+    "answer": "string (markdown)"
   }
 ]`;
 };
 
 export const conceptExplainPrompt = (question) => {
-  return `You are a senior developer explaining a concept to a junior developer.
-
-Explain the following interview question in depth:
+  return `You are a Senior Architect explaining a concept in a peer-review session.
+Deconstruct the following architectural/technical question:
 "${question}"
 
-Structure your explanation like this:
-1. Start with a **one-line definition** in bold.
-2. Explain the concept in 2–3 short paragraphs.
-3. Use bullet points for any list of features, pros/cons, or steps.
-4. If relevant, include a small code example (under 10 lines) in a \`\`\`js block.
-5. End with a **"Key Takeaway"** line summarizing the concept in one sentence.
+Structure:
+1. "title": 3-5 word high-impact title.
+2. "explanation": 
+   - Start with a bold one-sentence definition.
+   - 2 paragraphs of 'Deep-dive' explanation.
+   - Use a clear markdown list for key points.
+   - One "Key Takeaway" summarizing the industry standard.
 
-Return ONLY a valid JSON object in this exact shape. No extra text outside the JSON:
-
+Return ONLY a valid JSON object:
 {
-  "title": "Short, clear concept title (5 words max)",
-  "explanation": "**Definition:** ...\\n\\n Paragraph...\\n\\n**Key Takeaway:** ..."
+  "title": "string",
+  "explanation": "string (markdown)"
+}`;
+};
+
+export const evaluateAnswerPrompt = (question, answer) => {
+  return `You are an elite technical interviewer.
+Evaluate the candidate's response to the following question:
+Question: "${question}"
+Candidate's Response: "${answer}"
+
+Provide a brutal but constructive assessment.
+1. "score": 0-100 based on accuracy, depth, and communication.
+2. "feedback": Highlight exactly what's missing or what's impressive. (3-4 sentences max).
+3. "perfectAnswer": A concise, senior-level response that would get a 100/100 score.
+
+Return ONLY a valid JSON object:
+{
+  "score": number,
+  "feedback": "string",
+  "perfectAnswer": "string"
 }`;
 };
