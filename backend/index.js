@@ -32,7 +32,15 @@ const ensureConnection = async (req, res, next) => {
 
 // Middlewares
 app.use(cors({
-  origin: ["https://interview-ace-ai-frontend.vercel.app", "https://interview-ace-ai-frontend-ggf6.vercel.app", "http://localhost:5173", "http://localhost:3000"],
+  origin: (origin, callback) => {
+    const isVercel = origin && /^https:\/\/interview-ace-ai-frontend.*\.vercel\.app$/.test(origin);
+    const isLocal = origin && /http:\/\/localhost:(5173|3000)/.test(origin);
+    if (!origin || isVercel || isLocal) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
   credentials: true,
   optionsSuccessStatus: 200
 }));

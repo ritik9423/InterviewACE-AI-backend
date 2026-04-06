@@ -1,4 +1,9 @@
+import mongoose from "mongoose";
+
 let cachedConnection = null;
+
+// Disable buffering to catch connection errors immediately
+mongoose.set('bufferCommands', false);
 
 export const connectDB = async () => {
     if (cachedConnection) {
